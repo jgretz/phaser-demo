@@ -1,8 +1,12 @@
+/* eslint-disable class-methods-use-this */
 import Phaser from 'phaser';
+import ScoreLabel from '../ui/ScoreLabel';
 
 enum Keys {
   Ground = 'ground',
   Sky = 'sky',
+  Star = 'star',
+  Bomb = 'bomb',
 
   Dude = 'Dude',
 }
@@ -12,17 +16,22 @@ export default class GameScene extends Phaser.Scene {
 
   platforms?: Phaser.Physics.Arcade.StaticGroup;
 
+  stars?: Phaser.Physics.Arcade.Group;
+
   cursors?: Phaser.Types.Input.Keyboard.CursorKeys;
+
+  scoreLabel?: ScoreLabel;
 
   constructor() {
     super('game-scene');
   }
 
+  // Preload
   preload() {
-    this.load.image('sky', 'assets/sky.png');
-    this.load.image('ground', 'assets/platform.png');
-    this.load.image('star', 'assets/star.png');
-    this.load.image('bomb', 'assets/bomb.png');
+    this.load.image(Keys.Sky, 'assets/sky.png');
+    this.load.image(Keys.Ground, 'assets/platform.png');
+    this.load.image(Keys.Star, 'assets/star.png');
+    this.load.image(Keys.Bomb, 'assets/bomb.png');
 
     this.load.spritesheet(Keys.Dude, 'assets/dude.png', {
       frameWidth: 32,
@@ -30,14 +39,20 @@ export default class GameScene extends Phaser.Scene {
     });
   }
 
+  // Create
   create() {
     this.add.image(400, 300, Keys.Sky);
 
     this.createPlatforms();
     this.createPlayer();
+    this.createStars();
+    this.createScoreLabel(16, 16, 0);
 
-    if (this.player && this.platforms) {
+    if (this.player && this.platforms && this.stars) {
       this.physics.add.collider(this.player, this.platforms);
+      this.physics.add.collider(this.stars, this.platforms);
+
+      this.physics.add.overlap(this.player, this.stars, this.collectStar, undefined, this);
     }
 
     this.cursors = this.input.keyboard.createCursorKeys();
@@ -79,6 +94,31 @@ export default class GameScene extends Phaser.Scene {
     });
   }
 
+  createStars() {
+    this.stars = this.physics.add.group({
+      key: Keys.Star,
+      repeat: 11,
+      setXY: {x: 12, y: 0, stepX: 70},
+    });
+
+    const setBehavior = (child: Phaser.Physics.Arcade.Sprite) => {
+      child.setBounceY(Phaser.Math.FloatBetween(0.4, 0.8));
+      child.setCollideWorldBounds(true);
+    };
+
+    this.stars.children.iterate(setBehavior);
+  }
+
+  createScoreLabel(x: number, y: number, score: number) {
+    const style = {fontSize: '32px', fill: '#000'};
+
+    this.scoreLabel = new ScoreLabel(this, x, y, score, style);
+    if (this.scoreLabel) {
+      this.add.existing(this.scoreLabel);
+    }
+  }
+
+  // Update
   update() {
     if (!this.cursors || !this.player) {
       return;
@@ -100,6 +140,14 @@ export default class GameScene extends Phaser.Scene {
 
     if (this.cursors?.up?.isDown && this.player.body.touching.down) {
       this.player.setVelocityY(-330);
+    }
+  }
+
+  collectStar(player: Phaser.Physics.Arcade.Sprite, star: Phaser.Physics.Arcade.Sprite) {
+    star.disableBody(true, true);
+
+    if (this.scoreLabel) {
+      this.scoreLabel.add(10);
     }
   }
 }
